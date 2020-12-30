@@ -31,7 +31,7 @@ namespace GranSteL.DialogflowBalancer
         {
             foreach(var jsonKeyPath in _jsonKeysPathes)
             {
-                var client = CreateClient(jsonKeyPath);
+                var client = CreateSessionsClient(jsonKeyPath);
 
                 var wrapper = new ClientWrapper<SessionsClient>(client);
 
@@ -50,6 +50,11 @@ namespace GranSteL.DialogflowBalancer
 
         private SessionsClient GetSessionClient(string key)
         {
+            if (_cache.TryGetValue(key, out SessionsClient cachedClient))
+            {
+                return cachedClient;
+            }
+            
             var clientWrapper = _sessionsClients.OrderBy(d => d.Load).First();
 
             clientWrapper.Load += 1;
@@ -59,21 +64,7 @@ namespace GranSteL.DialogflowBalancer
             return clientWrapper.Client;
         }
 
-        private TItem GetOrCreate<TItem>(string key, Func<TItem> createItem)
-        {
-            TItem cacheEntry;
-            if (!_cache.TryGetValue(key, out cacheEntry)) // Ищем ключ в кэше.
-            {
-                // Ключ отсутствует в кэше, поэтому получаем данные.
-                cacheEntry = createItem();
-
-                // Сохраняем данные в кэше. 
-                _cache.Set(key, cacheEntry);
-            }
-            return cacheEntry;
-        }
-
-        private SessionsClient CreateClient(string jsonKeyPath)
+        private SessionsClient CreateSessionsClient(string jsonKeyPath)
         {
             var credential = GoogleCredential.FromFile(jsonKeyPath).CreateScoped(SessionsClient.DefaultScopes);
 
