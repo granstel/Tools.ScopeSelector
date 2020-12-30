@@ -4,21 +4,23 @@ using Grpc.Auth;
 using Microsoft.Extensions.Caching.Memory;
 using System;
 using System.Collections.Concurrent;
+using System.IO;
 using System.Linq;
 
 namespace GranSteL.DialogflowBalancer
 {
     public class Balancer
     {
-        private readonly string[] _jsonKeysPathes;
-
+        private readonly string[] _jsonKeys;
+        private readonly TimeSpan _expiration;
+        
         private readonly MemoryCache _cache;
+        private readonly ConcurrentBag<ClientWrapper<SessionsClient>> _sessionsClients;
 
-        private static ConcurrentBag<ClientWrapper<SessionsClient>> _sessionsClients;
-
-        public Balancer(string[] jsonKeysPathes)
+        public Balancer(string[] jsonKeys, TimeSpan expiration)
         {
-            _jsonKeysPathes = jsonKeysPathes;
+            _jsonKeys = jsonKeys;
+            _expiration = expiration;
 
             _cache = new MemoryCache(new MemoryCacheOptions());
 
@@ -29,11 +31,13 @@ namespace GranSteL.DialogflowBalancer
 
         private void InitSessionsClients()
         {
-            foreach(var jsonKeyPath in _jsonKeysPathes)
+            foreach(var jsonKeyPath in _jsonKeys)
             {
                 var client = CreateSessionsClient(jsonKeyPath);
 
-                var wrapper = new ClientWrapper<SessionsClient>(client);
+                var fileInfo = new FileInfo(jsonKeyPath);
+
+                var wrapper = new ClientWrapper<SessionsClient>(client, fileInfo.Name);
 
                 _sessionsClients.Add(wrapper);
             }
@@ -50,16 +54,18 @@ namespace GranSteL.DialogflowBalancer
 
         private SessionsClient GetSessionClient(string key)
         {
-            if (_cache.TryGetValue(key, out SessionsClient cachedClient))
+            if (_cache.TryGetValue(key, out string scopeKey))
             {
-                return cachedClient;
+                return _sessionsClients.Where(c => string.Equals(c.ScopeKey, scopeKey))
+                    .Select(c => c.Client)
+                    .First();
             }
             
             var clientWrapper = _sessionsClients.OrderBy(d => d.Load).First();
 
             clientWrapper.Load += 1;
             
-            _cache.Set(key, clientWrapper.Client, TimeSpan.FromMinutes(5));
+            _cache.Set(key, clientWrapper.ScopeKey, _expiration);
 
             return clientWrapper.Client;
         }
