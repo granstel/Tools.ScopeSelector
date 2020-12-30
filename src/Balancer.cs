@@ -11,48 +11,46 @@ namespace GranSteL.DialogflowBalancer
 {
     public class Balancer
     {
-        private readonly string[] _jsonKeys;
         private readonly TimeSpan _expiration;
         
         private readonly MemoryCache _cache;
         private readonly ConcurrentBag<ClientWrapper<SessionsClient>> _sessionsClients;
+        private readonly ConcurrentBag<ClientWrapper<ContextsClient>> _contextsClients;
 
         public Balancer(string[] jsonKeys, TimeSpan expiration)
         {
-            _jsonKeys = jsonKeys;
             _expiration = expiration;
 
             _cache = new MemoryCache(new MemoryCacheOptions());
 
             _sessionsClients = new ConcurrentBag<ClientWrapper<SessionsClient>>();
+            _contextsClients = new ConcurrentBag<ClientWrapper<ContextsClient>>();
 
-            InitSessionsClients();
-        }
-
-        private void InitSessionsClients()
-        {
-            foreach(var jsonKeyPath in _jsonKeys)
+            foreach(var jsonKeyPath in jsonKeys)
             {
-                var client = CreateSessionsClient(jsonKeyPath);
-
-                var fileInfo = new FileInfo(jsonKeyPath);
-
-                var wrapper = new ClientWrapper<SessionsClient>(client, fileInfo.Name);
-
-                _sessionsClients.Add(wrapper);
+                InitSessionsClient(jsonKeyPath);
+                InitContextsClient(jsonKeyPath);
             }
         }
 
-        public T InvokeSessionClient<T>(string key, Func<SessionsClient, T> function)
+        public T InvokeSessionsClient<T>(string key, Func<SessionsClient, T> invoke)
         {
-            var client = GetSessionClient(key);
+            var client = GetSessionsClient(key);
 
-            var result = function(client);
+            var result = invoke(client);
+
+            return result;
+        }
+        public T InvokeContextsClient<T>(string key, Func<ContextsClient, T> invoke)
+        {
+            var client = GetContextsClient(key);
+
+            var result = invoke(client);
 
             return result;
         }
 
-        private SessionsClient GetSessionClient(string key)
+        private SessionsClient GetSessionsClient(string key)
         {
             if (_cache.TryGetValue(key, out string scopeKey))
             {
@@ -69,8 +67,26 @@ namespace GranSteL.DialogflowBalancer
 
             return clientWrapper.Client;
         }
+        
+        private ContextsClient GetContextsClient(string key)
+        {
+            if (_cache.TryGetValue(key, out string scopeKey))
+            {
+                return _contextsClients.Where(c => string.Equals(c.ScopeKey, scopeKey))
+                    .Select(c => c.Client)
+                    .First();
+            }
+            
+            var clientWrapper = _contextsClients.OrderBy(d => d.Load).First();
 
-        private SessionsClient CreateSessionsClient(string jsonKeyPath)
+            clientWrapper.Load += 1;
+            
+            _cache.Set(key, clientWrapper.ScopeKey, _expiration);
+
+            return clientWrapper.Client;
+        }
+
+        private void InitSessionsClient(string jsonKeyPath)
         {
             var credential = GoogleCredential.FromFile(jsonKeyPath).CreateScoped(SessionsClient.DefaultScopes);
 
@@ -81,7 +97,27 @@ namespace GranSteL.DialogflowBalancer
 
             var client = clientBuilder.Build();
 
-            return client;
+            var fileInfo = new FileInfo(jsonKeyPath);
+            var wrapper = new ClientWrapper<SessionsClient>(client, fileInfo.Name);
+
+            _sessionsClients.Add(wrapper);
+        }
+
+        private void InitContextsClient(string jsonKeyPath)
+        {
+            var credential = GoogleCredential.FromFile(jsonKeyPath).CreateScoped(ContextsClient.DefaultScopes);
+
+            var clientBuilder = new ContextsClientBuilder
+            {
+                ChannelCredentials = credential.ToChannelCredentials()
+            };
+
+            var client = clientBuilder.Build();
+
+            var fileInfo = new FileInfo(jsonKeyPath);
+            var wrapper = new ClientWrapper<ContextsClient>(client, fileInfo.Name);
+
+            _contextsClients.Add(wrapper);
         }
     }
 }
