@@ -3,9 +3,8 @@ using Google.Cloud.Dialogflow.V2;
 using Grpc.Auth;
 using Microsoft.Extensions.Caching.Memory;
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
-using System.Threading.Tasks;
 
 namespace GranSteL.DialogflowBalancer
 {
@@ -15,7 +14,7 @@ namespace GranSteL.DialogflowBalancer
 
         private readonly MemoryCache _cache;
 
-        private static IDictionary<List<string>, SessionsClient> clientsDictinoary;
+        private static ConcurrentBag<ClientWrapper<SessionsClient>> _sessionsClients;
 
         public Balancer(string[] jsonKeysPathes)
         {
@@ -23,53 +22,41 @@ namespace GranSteL.DialogflowBalancer
 
             _cache = new MemoryCache(new MemoryCacheOptions());
 
-            clientsDictinoary = new Dictionary<List<string>, SessionsClient>();
+            _sessionsClients = new ConcurrentBag<ClientWrapper<SessionsClient>>();
 
-            InitClients();
+            InitSessionsClients();
         }
 
-        private void InitClients()
+        private void InitSessionsClients()
         {
             foreach(var jsonKeyPath in _jsonKeysPathes)
             {
                 var client = CreateClient(jsonKeyPath);
 
-                clientsDictinoary.Add(new List<string>(), client);
+                var wrapper = new ClientWrapper<SessionsClient>(client);
 
-                //var info = new FileInfo(jsonKeyPath);
-                //var key = info.Name;
-
-                //var client = GetOrCreate(key, () => CreateClient(jsonKeyPath));
+                _sessionsClients.Add(wrapper);
             }
         }
 
-        public async Task<DetectIntentResponse> DetectIntentAsync(DetectIntentRequest request)
+        public T InvokeSessionClient<T>(string key, Func<SessionsClient, T> function)
         {
-            var client = GetClient(request.Session);
+            var client = GetSessionClient(key);
 
-            var response = await client.DetectIntentAsync(request);
+            var result = function(client);
 
-            return response;
+            return result;
         }
 
-        public DetectIntentResponse DetectIntent(DetectIntentRequest request)
+        private SessionsClient GetSessionClient(string key)
         {
-            var client = GetClient(request.Session);
+            var clientWrapper = _sessionsClients.OrderBy(d => d.Load).First();
 
-            var response = client.DetectIntent(request);
+            clientWrapper.Load += 1;
+            
+            _cache.Set(key, clientWrapper.Client, TimeSpan.FromMinutes(5));
 
-            return response;
-        }
-
-        private SessionsClient GetClient(string session)
-        {
-            var maxLoaded = clientsDictinoary.Max(d => d.Key.Count);
-
-            var client = clientsDictinoary.Where(d => d.Key.Contains(session)).Select(d => d.Value).FirstOrDefault() ??
-                         clientsDictinoary.Where(d => d.Key.Count < maxLoaded).Select(d => d.Value).FirstOrDefault() ??
-                         clientsDictinoary.Select(d => d.Value).FirstOrDefault();
-
-            return client;
+            return clientWrapper.Client;
         }
 
         private TItem GetOrCreate<TItem>(string key, Func<TItem> createItem)
