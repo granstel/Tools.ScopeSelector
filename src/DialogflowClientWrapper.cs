@@ -4,7 +4,7 @@
     {
         public DialogflowClientWrapper(T client, DialogflowContext context)
         {
-            Client = Client;
+            Client = client;
             ScopeKey = context.ProjectId;
             Context = context;
         }
