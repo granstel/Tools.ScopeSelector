@@ -11,7 +11,7 @@ namespace GranSteL.DialogflowBalancer
     public class DialogflowClientsBalancer
     {
         private readonly TimeSpan _expiration;
-        
+
         private readonly MemoryCache _cache;
         private readonly ConcurrentBag<DialogflowClientWrapper<SessionsClient>> _sessionsClients;
         private readonly ConcurrentBag<DialogflowClientWrapper<ContextsClient>> _contextsClients;
@@ -44,58 +44,62 @@ namespace GranSteL.DialogflowBalancer
             }
         }
 
-        public T InvokeSessionsClient<T>(string key, Func<SessionsClient, T> invoke)
+        public T InvokeSessionsClient<T>(string key, Func<SessionsClient, DialogflowContext, T> invoke)
         {
-            var client = GetSessionsClient(key);
+            var sessionsClientWrapper = GetSessionsClientWrapper(key);
 
-            var result = invoke(client);
+            var result = invoke(sessionsClientWrapper.Client, sessionsClientWrapper.Context);
 
             return result;
         }
 
-        public T InvokeContextsClient<T>(string key, Func<ContextsClient, T> invoke)
+        public T InvokeContextsClient<T>(string key, Func<ContextsClient, DialogflowContext, T> invoke)
         {
-            var client = GetContextsClient(key);
+            var contextsClientWrapper = GetContextsClientWrapper(key);
 
-            var result = invoke(client);
+            var result = invoke(contextsClientWrapper.Client, contextsClientWrapper.Context);
 
             return result;
         }
 
-        private SessionsClient GetSessionsClient(string key)
+        private DialogflowClientWrapper<SessionsClient> GetSessionsClientWrapper(string key)
         {
+            DialogflowClientWrapper<SessionsClient> clientWrapper;
+
             if (_cache.TryGetValue(key, out string scopeKey))
             {
-                return _sessionsClients.Where(c => string.Equals(c.ScopeKey, scopeKey))
-                    .Select(c => c.Client)
-                    .First();
+                clientWrapper = _sessionsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
             }
-            
-            var clientWrapper = _sessionsClients.OrderBy(d => d.Load).First();
+            else
+            {
+                clientWrapper = _sessionsClients.OrderBy(d => d.Load).First();
+            }
 
             clientWrapper.Load += 1;
-            
+
             _cache.Set(key, clientWrapper.ScopeKey, _expiration);
 
-            return clientWrapper.Client;
+            return clientWrapper;
         }
-        
-        private ContextsClient GetContextsClient(string key)
+
+        private DialogflowClientWrapper<ContextsClient> GetContextsClientWrapper(string key)
         {
+            DialogflowClientWrapper<ContextsClient> clientWrapper;
+
             if (_cache.TryGetValue(key, out string scopeKey))
             {
-                return _contextsClients.Where(c => string.Equals(c.ScopeKey, scopeKey))
-                    .Select(c => c.Client)
-                    .First();
+                clientWrapper = _contextsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
             }
-            
-            var clientWrapper = _contextsClients.OrderBy(d => d.Load).First();
+            else
+            {
+                clientWrapper = _contextsClients.OrderBy(d => d.Load).First();
+            }
 
             clientWrapper.Load += 1;
-            
+
             _cache.Set(key, clientWrapper.ScopeKey, _expiration);
 
-            return clientWrapper.Client;
+            return clientWrapper;
         }
 
         private SessionsClient DefaultInitSessionsClient(DialogflowContext context)
