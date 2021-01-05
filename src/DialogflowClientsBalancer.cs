@@ -4,32 +4,43 @@ using Grpc.Auth;
 using Microsoft.Extensions.Caching.Memory;
 using System;
 using System.Collections.Concurrent;
-using System.IO;
 using System.Linq;
 
 namespace GranSteL.DialogflowBalancer
 {
-    public class Balancer
+    public class DialogflowClientsBalancer
     {
         private readonly TimeSpan _expiration;
         
         private readonly MemoryCache _cache;
-        private readonly ConcurrentBag<ClientWrapper<SessionsClient>> _sessionsClients;
-        private readonly ConcurrentBag<ClientWrapper<ContextsClient>> _contextsClients;
+        private readonly ConcurrentBag<DialogflowClientWrapper<SessionsClient>> _sessionsClients;
+        private readonly ConcurrentBag<DialogflowClientWrapper<ContextsClient>> _contextsClients;
 
-        public Balancer(string[] jsonKeys, TimeSpan expiration)
+        public Func<DialogflowContext, SessionsClient> InitSessionsClient;
+        public Func<DialogflowContext, ContextsClient> InitContextsClient;
+
+        public DialogflowClientsBalancer(
+            DialogflowBalancerConfiguration configuration,
+            Func<DialogflowContext, SessionsClient> initSessionsClient = null,
+            Func<DialogflowContext, ContextsClient> initContextsClient = null
+            )
         {
-            _expiration = expiration;
+            _expiration = configuration.ScopeExpiration;
 
             _cache = new MemoryCache(new MemoryCacheOptions());
 
-            _sessionsClients = new ConcurrentBag<ClientWrapper<SessionsClient>>();
-            _contextsClients = new ConcurrentBag<ClientWrapper<ContextsClient>>();
+            _sessionsClients = new ConcurrentBag<DialogflowClientWrapper<SessionsClient>>();
+            _contextsClients = new ConcurrentBag<DialogflowClientWrapper<ContextsClient>>();
 
-            foreach(var jsonKeyPath in jsonKeys)
+            InitSessionsClient = initSessionsClient ?? DefaultInitSessionsClient;
+            InitContextsClient = initContextsClient ?? DefaultInitContextsClient;
+
+            foreach (var clientsConfiguration in configuration.ClientsConfigurations)
             {
-                InitSessionsClient(jsonKeyPath);
-                InitContextsClient(jsonKeyPath);
+                var context = new DialogflowContext(clientsConfiguration);
+
+                InitSessionsClientInternal(context);
+                InitContextsClientInternal(context);
             }
         }
 
@@ -41,6 +52,7 @@ namespace GranSteL.DialogflowBalancer
 
             return result;
         }
+
         public T InvokeContextsClient<T>(string key, Func<ContextsClient, T> invoke)
         {
             var client = GetContextsClient(key);
@@ -86,9 +98,9 @@ namespace GranSteL.DialogflowBalancer
             return clientWrapper.Client;
         }
 
-        private void InitSessionsClient(string jsonKeyPath)
+        private SessionsClient DefaultInitSessionsClient(DialogflowContext context)
         {
-            var credential = GoogleCredential.FromFile(jsonKeyPath).CreateScoped(SessionsClient.DefaultScopes);
+            var credential = GoogleCredential.FromFile(context.JsonPath).CreateScoped(SessionsClient.DefaultScopes);
 
             var clientBuilder = new SessionsClientBuilder
             {
@@ -97,15 +109,12 @@ namespace GranSteL.DialogflowBalancer
 
             var client = clientBuilder.Build();
 
-            var fileInfo = new FileInfo(jsonKeyPath);
-            var wrapper = new ClientWrapper<SessionsClient>(client, fileInfo.Name);
-
-            _sessionsClients.Add(wrapper);
+            return client;
         }
 
-        private void InitContextsClient(string jsonKeyPath)
+        private ContextsClient DefaultInitContextsClient(DialogflowContext context)
         {
-            var credential = GoogleCredential.FromFile(jsonKeyPath).CreateScoped(ContextsClient.DefaultScopes);
+            var credential = GoogleCredential.FromFile(context.JsonPath).CreateScoped(ContextsClient.DefaultScopes);
 
             var clientBuilder = new ContextsClientBuilder
             {
@@ -114,8 +123,23 @@ namespace GranSteL.DialogflowBalancer
 
             var client = clientBuilder.Build();
 
-            var fileInfo = new FileInfo(jsonKeyPath);
-            var wrapper = new ClientWrapper<ContextsClient>(client, fileInfo.Name);
+            return client;
+        }
+
+        private void InitSessionsClientInternal(DialogflowContext context)
+        {
+            var client = InitSessionsClient(context);
+
+            var wrapper = new DialogflowClientWrapper<SessionsClient>(client, context);
+
+            _sessionsClients.Add(wrapper);
+        }
+
+        private void InitContextsClientInternal(DialogflowContext context)
+        {
+            var client = InitContextsClient(context);
+
+            var wrapper = new DialogflowClientWrapper<ContextsClient>(client, context);
 
             _contextsClients.Add(wrapper);
         }
