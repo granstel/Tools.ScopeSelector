@@ -69,13 +69,13 @@ namespace GranSteL.DialogflowBalancer
             if (_cache.TryGetValue(key, out string scopeKey))
             {
                 clientWrapper = _sessionsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
+
+                clientWrapper.Load += 1;
             }
             else
             {
                 clientWrapper = _sessionsClients.OrderBy(d => d.Load).First();
             }
-
-            clientWrapper.Load += 1;
 
             _cache.Set(key, clientWrapper.ScopeKey, _expiration);
 
@@ -89,13 +89,13 @@ namespace GranSteL.DialogflowBalancer
             if (_cache.TryGetValue(key, out string scopeKey))
             {
                 clientWrapper = _contextsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
+
+                clientWrapper.Load += 1;
             }
             else
             {
                 clientWrapper = _contextsClients.OrderBy(d => d.Load).First();
             }
-
-            clientWrapper.Load += 1;
 
             _cache.Set(key, clientWrapper.ScopeKey, _expiration);
 
