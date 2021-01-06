@@ -125,7 +125,7 @@ namespace GranSteL.DialogflowBalancer
 
         private void EvictionCallback(object key, object value, EvictionReason reason, object state)
         {
-            if (string.Equals(state, $"{nameof(DialogflowClientWrapper<object>.ScopeKey)}") && value is string scopeKey)
+            if (reason == EvictionReason.Expired && string.Equals(state, $"{nameof(DialogflowClientWrapper<object>.ScopeKey)}") && value is string scopeKey)
             {
                 _scopeLoads[scopeKey] -= 1;
             }
