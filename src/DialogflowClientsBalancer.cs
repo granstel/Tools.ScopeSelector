@@ -4,7 +4,6 @@ using Grpc.Auth;
 using Microsoft.Extensions.Caching.Memory;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Linq;
 
 namespace GranSteL.DialogflowBalancer
@@ -14,7 +13,7 @@ namespace GranSteL.DialogflowBalancer
         private readonly TimeSpan _expiration;
 
         private readonly MemoryCache _cache;
-        private readonly ConcurrentDictionary<string, int> _scopeLoads;
+        private readonly ConcurrentBag<Scope> _scopes;
 
         private readonly ConcurrentBag<DialogflowClientWrapper<SessionsClient>> _sessionsClients;
         private readonly ConcurrentBag<DialogflowClientWrapper<ContextsClient>> _contextsClients;
@@ -32,7 +31,7 @@ namespace GranSteL.DialogflowBalancer
 
             _cache = new MemoryCache(new MemoryCacheOptions());
 
-            _scopeLoads = new ConcurrentDictionary<string, int>();
+            _scopes = new ConcurrentBag<Scope>();
 
             _sessionsClients = new ConcurrentBag<DialogflowClientWrapper<SessionsClient>>();
             _contextsClients = new ConcurrentBag<DialogflowClientWrapper<ContextsClient>>();
@@ -40,12 +39,19 @@ namespace GranSteL.DialogflowBalancer
             InitSessionsClient = initSessionsClient ?? DefaultInitSessionsClient;
             InitContextsClient = initContextsClient ?? DefaultInitContextsClient;
 
+            var scopes = configuration.ClientsConfigurations.Select(c => c.ProjectId).Distinct().ToList();
+
+            for (var i = 0; i < scopes.Count; i++)
+            {
+                var scopeName = scopes[i];
+                var scope = new Scope(scopeName, i);
+                _scopes.Add(scope);
+            }
+
             foreach (var clientsConfiguration in configuration.ClientsConfigurations)
             {
                 var context = new DialogflowContext(clientsConfiguration);
                 
-                _scopeLoads.GetOrAdd(context.ProjectId, 0);
-
                 InitSessionsClientInternal(context);
                 InitContextsClientInternal(context);
             }
@@ -73,25 +79,12 @@ namespace GranSteL.DialogflowBalancer
         {
             if (!_cache.TryGetValue(key, out string scopeKey))
             {
-                scopeKey = _scopeLoads.OrderBy(s => s.Value).Select(s => s.Key).First();
-
-                _scopeLoads[scopeKey] += 1;
+                scopeKey = GetScopeKey();
             }
 
             var clientWrapper = _sessionsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
 
-            var options = new MemoryCacheEntryOptions
-            {
-                AbsoluteExpirationRelativeToNow = _expiration
-            };
-
-            options.PostEvictionCallbacks.Add(new PostEvictionCallbackRegistration
-            {
-                EvictionCallback = EvictionCallback,
-                State = $"{nameof(clientWrapper.ScopeKey)}"
-            });
-
-            _cache.Set(key, clientWrapper.ScopeKey, options);
+            _cache.Set(key, clientWrapper.ScopeKey, _expiration);
 
             return clientWrapper;
         }
@@ -100,35 +93,37 @@ namespace GranSteL.DialogflowBalancer
         {
             if (!_cache.TryGetValue(key, out string scopeKey))
             {
-                scopeKey = _scopeLoads.OrderBy(s => s.Value).Select(s => s.Key).First();
-
-                _scopeLoads[scopeKey] += 1;
+                scopeKey = GetScopeKey();
             }
 
             var clientWrapper = _contextsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
 
-            var options = new MemoryCacheEntryOptions
-            {
-                AbsoluteExpirationRelativeToNow = _expiration
-            };
-
-            options.PostEvictionCallbacks.Add(new PostEvictionCallbackRegistration
-            {
-                EvictionCallback = EvictionCallback,
-                State = $"{nameof(clientWrapper.ScopeKey)}"
-            });
-
-            _cache.Set(key, clientWrapper.ScopeKey, options);
+            _cache.Set(key, clientWrapper.ScopeKey, _expiration);
 
             return clientWrapper;
         }
 
-        private void EvictionCallback(object key, object value, EvictionReason reason, object state)
+        private string GetScopeKey()
         {
-            if (reason == EvictionReason.Expired && string.Equals(state, $"{nameof(DialogflowClientWrapper<object>.ScopeKey)}") && value is string scopeKey)
+            var orderedScopes = _scopes.OrderBy(s => s.Priority).ToList();
+
+            var scopeKey = string.Empty;
+
+            for (var i = 0; i < orderedScopes.Count; i++)
             {
-                _scopeLoads[scopeKey] -= 1;
+                var scope = orderedScopes[i];
+
+                if (i == 0)
+                {
+                    scopeKey = scope.Name;
+                    scope.Priority = orderedScopes.Count - 1;
+                    continue;
+                }
+
+                scope.Priority -= 1;
             }
+
+            return scopeKey;
         }
 
         private SessionsClient DefaultInitSessionsClient(DialogflowContext context)
