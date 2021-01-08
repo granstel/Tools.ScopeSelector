@@ -1,10 +1,10 @@
 ﻿using Google.Apis.Auth.OAuth2;
 using Google.Cloud.Dialogflow.V2;
 using Grpc.Auth;
-using Microsoft.Extensions.Caching.Memory;
 using System;
 using System.Collections.Concurrent;
 using System.Linq;
+using GranSteL.Helpers.Redis;
 
 namespace GranSteL.DialogflowBalancer
 {
@@ -12,7 +12,7 @@ namespace GranSteL.DialogflowBalancer
     {
         private readonly TimeSpan _expiration;
 
-        private readonly MemoryCache _cache;
+        private readonly IRedisCacheService _cache;
         private readonly ConcurrentBag<Scope> _scopes;
 
         private readonly ConcurrentBag<DialogflowClientWrapper<SessionsClient>> _sessionsClients;
@@ -22,6 +22,7 @@ namespace GranSteL.DialogflowBalancer
         public Func<DialogflowContext, ContextsClient> InitContextsClient;
 
         public DialogflowClientsBalancer(
+            IRedisCacheService cache,
             DialogflowBalancerConfiguration configuration,
             Func<DialogflowContext, SessionsClient> initSessionsClient = null,
             Func<DialogflowContext, ContextsClient> initContextsClient = null
@@ -29,7 +30,7 @@ namespace GranSteL.DialogflowBalancer
         {
             _expiration = configuration.ScopeExpiration;
 
-            _cache = new MemoryCache(new MemoryCacheOptions());
+            _cache = cache;
 
             _scopes = new ConcurrentBag<Scope>();
 
@@ -77,28 +78,28 @@ namespace GranSteL.DialogflowBalancer
 
         private DialogflowClientWrapper<SessionsClient> GetSessionsClientWrapper(string key)
         {
-            if (!_cache.TryGetValue(key, out string scopeKey))
+            if (!_cache.TryGet(key, out string scopeKey))
             {
                 scopeKey = GetScopeKey();
             }
 
             var clientWrapper = _sessionsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
 
-            _cache.Set(key, clientWrapper.ScopeKey, _expiration);
+            _cache.Add(key, clientWrapper.ScopeKey, _expiration);
 
             return clientWrapper;
         }
 
         private DialogflowClientWrapper<ContextsClient> GetContextsClientWrapper(string key)
         {
-            if (!_cache.TryGetValue(key, out string scopeKey))
+            if (!_cache.TryGet(key, out string scopeKey))
             {
                 scopeKey = GetScopeKey();
             }
 
             var clientWrapper = _contextsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
 
-            _cache.Set(key, clientWrapper.ScopeKey, _expiration);
+            _cache.Add(key, clientWrapper.ScopeKey, _expiration);
 
             return clientWrapper;
         }
