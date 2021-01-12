@@ -78,28 +78,32 @@ namespace GranSteL.DialogflowBalancer
 
         private DialogflowClientWrapper<SessionsClient> GetSessionsClientWrapper(string key)
         {
-            if (!_cache.TryGet(key, out string scopeKey))
+            var cacheKey = GetCacheKey(key);
+
+            if (!_cache.TryGet(cacheKey, out string scopeKey))
             {
                 scopeKey = GetScopeKey();
             }
 
             var clientWrapper = _sessionsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
 
-            _cache.Add(key, clientWrapper.ScopeKey, _expiration);
+            _cache.Add(cacheKey, clientWrapper.ScopeKey, _expiration);
 
             return clientWrapper;
         }
 
         private DialogflowClientWrapper<ContextsClient> GetContextsClientWrapper(string key)
         {
-            if (!_cache.TryGet(key, out string scopeKey))
+            var cacheKey = GetCacheKey(key);
+
+            if (!_cache.TryGet(cacheKey, out string scopeKey))
             {
                 scopeKey = GetScopeKey();
             }
 
             var clientWrapper = _contextsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
 
-            _cache.Add(key, clientWrapper.ScopeKey, _expiration);
+            _cache.Add(cacheKey, clientWrapper.ScopeKey, _expiration);
 
             return clientWrapper;
         }
@@ -171,6 +175,11 @@ namespace GranSteL.DialogflowBalancer
             var wrapper = new DialogflowClientWrapper<ContextsClient>(client, context);
 
             _contextsClients.Add(wrapper);
+        }
+
+        private string GetCacheKey(string key)
+        {
+            return $"scopes:{key}";
         }
     }
 }
