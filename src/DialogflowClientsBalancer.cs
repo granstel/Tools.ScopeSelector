@@ -91,15 +91,17 @@ namespace GranSteL.DialogflowBalancer
 
         private DialogflowClientWrapper<SessionsClient> GetSessionsClientWrapper(string key, string suggestedScopeKey = null)
         {
+            DialogflowClientWrapper<SessionsClient> clientWrapper;
+
             string scopeKey;
 
-            DialogflowClientWrapper<SessionsClient> clientWrapper;
+            var cacheKey = GetCacheKey(key);
 
             if (!string.IsNullOrEmpty(suggestedScopeKey))
             {
                 scopeKey = suggestedScopeKey;
 
-                clientWrapper = _sessionsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
+                clientWrapper = GetClientWrapper(scopeKey, cacheKey, _sessionsClients);
 
                 if (clientWrapper != null)
                 {
@@ -107,31 +109,29 @@ namespace GranSteL.DialogflowBalancer
                 }
             }
 
-            var cacheKey = GetCacheKey(key);
-
             if (!_cache.TryGet(cacheKey, out scopeKey))
             {
                 scopeKey = GetNextScopeKey();
             }
 
-            clientWrapper = _sessionsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
-
-            _cache.AddAsync(cacheKey, clientWrapper.ScopeKey, _expiration).Forget();
+            clientWrapper = GetClientWrapper(scopeKey, cacheKey, _sessionsClients);
 
             return clientWrapper;
         }
 
         private DialogflowClientWrapper<ContextsClient> GetContextsClientWrapper(string key, string suggestedScopeKey = null)
         {
+            DialogflowClientWrapper<ContextsClient> clientWrapper;
+
             string scopeKey;
 
-            DialogflowClientWrapper<ContextsClient> clientWrapper;
+            var cacheKey = GetCacheKey(key);
 
             if (!string.IsNullOrEmpty(suggestedScopeKey))
             {
                 scopeKey = suggestedScopeKey;
 
-                clientWrapper = _contextsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
+                clientWrapper = GetClientWrapper(scopeKey, cacheKey, _contextsClients);
 
                 if (clientWrapper != null)
                 {
@@ -139,18 +139,29 @@ namespace GranSteL.DialogflowBalancer
                 }
             }
 
-            var cacheKey = GetCacheKey(key);
-
             if (!_cache.TryGet(cacheKey, out scopeKey))
             {
                 scopeKey = GetNextScopeKey();
             }
 
-            clientWrapper = _contextsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
+            clientWrapper = GetClientWrapper(scopeKey, cacheKey, _contextsClients);
+
+            return clientWrapper;
+        }
+
+        private DialogflowClientWrapper<T> GetClientWrapper<T>(string scopeKey, string cacheKey, ConcurrentBag<DialogflowClientWrapper<T>> contextsClients)
+        {
+            var clientWrapper = contextsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
+
+            if (clientWrapper == null)
+            {
+                return null;
+            }
 
             _cache.AddAsync(cacheKey, clientWrapper.ScopeKey, _expiration).Forget();
 
             return clientWrapper;
+
         }
 
         private string GetNextScopeKey()
