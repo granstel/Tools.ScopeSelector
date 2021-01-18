@@ -61,7 +61,7 @@ namespace GranSteL.DialogflowBalancer
 
         public T InvokeSessionsClient<T>(string key, Func<SessionsClient, DialogflowContext, T> invoke, string suggestedScopeKey = null)
         {
-            var sessionsClientWrapper = GetSessionsClientWrapper(key, suggestedScopeKey);
+            var sessionsClientWrapper = GetClientWrapper(key, _sessionsClients, suggestedScopeKey);
 
             var result = invoke(sessionsClientWrapper.Client, sessionsClientWrapper.Context);
 
@@ -70,92 +70,27 @@ namespace GranSteL.DialogflowBalancer
 
         public T InvokeContextsClient<T>(string key, Func<ContextsClient, DialogflowContext, T> invoke, string suggestedScopeKey = null)
         {
-            var contextsClientWrapper = GetContextsClientWrapper(key, suggestedScopeKey);
+            var contextsClientWrapper = GetClientWrapper(key, _contextsClients, suggestedScopeKey);
 
             var result = invoke(contextsClientWrapper.Client, contextsClientWrapper.Context);
 
             return result;
         }
 
-        public string GetScopeKey(string key)
+        private DialogflowClientWrapper<T> GetClientWrapper<T>(string key, ConcurrentBag<DialogflowClientWrapper<T>> clients, string suggestedScopeKey = null)
         {
             var cacheKey = GetCacheKey(key);
 
-            if (!_cache.TryGet(cacheKey, out string scopeKey))
-            {
-                scopeKey = GetNextScopeKey();
-            }
-
-            return scopeKey;
-        }
-
-        private DialogflowClientWrapper<SessionsClient> GetSessionsClientWrapper(string key, string suggestedScopeKey = null)
-        {
-            DialogflowClientWrapper<SessionsClient> clientWrapper;
-
-            string scopeKey;
-
-            var cacheKey = GetCacheKey(key);
-
-            if (!string.IsNullOrEmpty(suggestedScopeKey))
-            {
-                scopeKey = suggestedScopeKey;
-
-                clientWrapper = GetClientWrapper(scopeKey, cacheKey, _sessionsClients);
-
-                if (clientWrapper != null)
-                {
-                    return clientWrapper;
-                }
-            }
-
-            if (!_cache.TryGet(cacheKey, out scopeKey))
-            {
-                scopeKey = GetNextScopeKey();
-            }
-
-            clientWrapper = GetClientWrapper(scopeKey, cacheKey, _sessionsClients);
-
-            return clientWrapper;
-        }
-
-        private DialogflowClientWrapper<ContextsClient> GetContextsClientWrapper(string key, string suggestedScopeKey = null)
-        {
-            DialogflowClientWrapper<ContextsClient> clientWrapper;
-
-            string scopeKey;
-
-            var cacheKey = GetCacheKey(key);
-
-            if (!string.IsNullOrEmpty(suggestedScopeKey))
-            {
-                scopeKey = suggestedScopeKey;
-
-                clientWrapper = GetClientWrapper(scopeKey, cacheKey, _contextsClients);
-
-                if (clientWrapper != null)
-                {
-                    return clientWrapper;
-                }
-            }
-
-            if (!_cache.TryGet(cacheKey, out scopeKey))
-            {
-                scopeKey = GetNextScopeKey();
-            }
-
-            clientWrapper = GetClientWrapper(scopeKey, cacheKey, _contextsClients);
-
-            return clientWrapper;
-        }
-
-        private DialogflowClientWrapper<T> GetClientWrapper<T>(string scopeKey, string cacheKey, ConcurrentBag<DialogflowClientWrapper<T>> contextsClients)
-        {
-            var clientWrapper = contextsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
+            var clientWrapper = clients.First(c => string.Equals(c.ScopeKey, suggestedScopeKey));
 
             if (clientWrapper == null)
             {
-                return null;
+                if (!_cache.TryGet(cacheKey, out string scopeKey))
+                {
+                    scopeKey = GetNextScopeKey();
+                }
+
+                clientWrapper = clients.First(c => string.Equals(c.ScopeKey, scopeKey));
             }
 
             _cache.AddAsync(cacheKey, clientWrapper.ScopeKey, _expiration).Forget();
