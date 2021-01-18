@@ -5,6 +5,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using GranSteL.Helpers.Redis;
+using GranSteL.DialogflowBalancer.Extensions;
 
 namespace GranSteL.DialogflowBalancer
 {
@@ -52,63 +53,107 @@ namespace GranSteL.DialogflowBalancer
             foreach (var clientsConfiguration in configuration.ClientsConfigurations)
             {
                 var context = new DialogflowContext(clientsConfiguration);
-                
+
                 InitSessionsClientInternal(context);
                 InitContextsClientInternal(context);
             }
         }
 
-        public T InvokeSessionsClient<T>(string key, Func<SessionsClient, DialogflowContext, T> invoke)
+        public T InvokeSessionsClient<T>(string key, Func<SessionsClient, DialogflowContext, T> invoke, string suggestedScopeKey = null)
         {
-            var sessionsClientWrapper = GetSessionsClientWrapper(key);
+            var sessionsClientWrapper = GetSessionsClientWrapper(key, suggestedScopeKey);
 
             var result = invoke(sessionsClientWrapper.Client, sessionsClientWrapper.Context);
 
             return result;
         }
 
-        public T InvokeContextsClient<T>(string key, Func<ContextsClient, DialogflowContext, T> invoke)
+        public T InvokeContextsClient<T>(string key, Func<ContextsClient, DialogflowContext, T> invoke, string suggestedScopeKey = null)
         {
-            var contextsClientWrapper = GetContextsClientWrapper(key);
+            var contextsClientWrapper = GetContextsClientWrapper(key, suggestedScopeKey);
 
             var result = invoke(contextsClientWrapper.Client, contextsClientWrapper.Context);
 
             return result;
         }
 
-        private DialogflowClientWrapper<SessionsClient> GetSessionsClientWrapper(string key)
+        public string GetScopeKey(string key)
         {
             var cacheKey = GetCacheKey(key);
 
             if (!_cache.TryGet(cacheKey, out string scopeKey))
             {
-                scopeKey = GetScopeKey();
+                scopeKey = GetNextScopeKey();
             }
 
-            var clientWrapper = _sessionsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
-
-            _cache.Add(cacheKey, clientWrapper.ScopeKey, _expiration);
-
-            return clientWrapper;
+            return scopeKey;
         }
 
-        private DialogflowClientWrapper<ContextsClient> GetContextsClientWrapper(string key)
+        private DialogflowClientWrapper<SessionsClient> GetSessionsClientWrapper(string key, string suggestedScopeKey = null)
         {
+            string scopeKey;
+
+            DialogflowClientWrapper<SessionsClient> clientWrapper;
+
+            if (!string.IsNullOrEmpty(suggestedScopeKey))
+            {
+                scopeKey = suggestedScopeKey;
+
+                clientWrapper = _sessionsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
+
+                if (clientWrapper != null)
+                {
+                    return clientWrapper;
+                }
+            }
+
             var cacheKey = GetCacheKey(key);
 
-            if (!_cache.TryGet(cacheKey, out string scopeKey))
+            if (!_cache.TryGet(cacheKey, out scopeKey))
             {
-                scopeKey = GetScopeKey();
+                scopeKey = GetNextScopeKey();
             }
 
-            var clientWrapper = _contextsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
+            clientWrapper = _sessionsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
 
-            _cache.Add(cacheKey, clientWrapper.ScopeKey, _expiration);
+            _cache.AddAsync(cacheKey, clientWrapper.ScopeKey, _expiration).Forget();
 
             return clientWrapper;
         }
 
-        private string GetScopeKey()
+        private DialogflowClientWrapper<ContextsClient> GetContextsClientWrapper(string key, string suggestedScopeKey = null)
+        {
+            string scopeKey;
+
+            DialogflowClientWrapper<ContextsClient> clientWrapper;
+
+            if (!string.IsNullOrEmpty(suggestedScopeKey))
+            {
+                scopeKey = suggestedScopeKey;
+
+                clientWrapper = _contextsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
+
+                if (clientWrapper != null)
+                {
+                    return clientWrapper;
+                }
+            }
+
+            var cacheKey = GetCacheKey(key);
+
+            if (!_cache.TryGet(cacheKey, out scopeKey))
+            {
+                scopeKey = GetNextScopeKey();
+            }
+
+            clientWrapper = _contextsClients.First(c => string.Equals(c.ScopeKey, scopeKey));
+
+            _cache.AddAsync(cacheKey, clientWrapper.ScopeKey, _expiration).Forget();
+
+            return clientWrapper;
+        }
+
+        private string GetNextScopeKey()
         {
             var orderedScopes = _scopes.OrderBy(s => s.Priority).ToList();
 
