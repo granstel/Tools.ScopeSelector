@@ -3,8 +3,8 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>0.0.1</Version>
-    <Description>DF agents load balancing tool</Description>
+    <Version>0.0.2</Version>
+    <Description>Use suggested scope key</Description>
   </PropertyGroup>
 
   <ItemGroup>
