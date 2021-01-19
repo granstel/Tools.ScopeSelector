@@ -81,7 +81,7 @@ namespace GranSteL.DialogflowBalancer
         {
             var cacheKey = GetCacheKey(key);
 
-            var clientWrapper = clients.First(c => string.Equals(c.ScopeKey, suggestedScopeKey));
+            var clientWrapper = clients.FirstOrDefault(c => string.Equals(c.ScopeKey, suggestedScopeKey));
 
             if (clientWrapper == null)
             {
