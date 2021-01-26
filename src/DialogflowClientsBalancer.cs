@@ -108,9 +108,7 @@ namespace GranSteL.DialogflowBalancer
 
             _scopes.Enqueue(scope);
 
-            var scopeKey = string.Empty;
-
-            return scopeKey;
+            return scope.Name;
         }
 
         private SessionsClient DefaultInitSessionsClient(DialogflowContext context)
