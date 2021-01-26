@@ -14,7 +14,7 @@ namespace GranSteL.DialogflowBalancer
         private readonly TimeSpan _expiration;
 
         private readonly IRedisCacheService _cache;
-        private readonly ConcurrentBag<Scope> _scopes;
+        private readonly ConcurrentQueue<Scope> _scopes;
 
         private readonly ConcurrentBag<DialogflowClientWrapper<SessionsClient>> _sessionsClients;
         private readonly ConcurrentBag<DialogflowClientWrapper<ContextsClient>> _contextsClients;
@@ -33,7 +33,7 @@ namespace GranSteL.DialogflowBalancer
 
             _cache = cache;
 
-            _scopes = new ConcurrentBag<Scope>();
+            _scopes = new ConcurrentQueue<Scope>();
 
             _sessionsClients = new ConcurrentBag<DialogflowClientWrapper<SessionsClient>>();
             _contextsClients = new ConcurrentBag<DialogflowClientWrapper<ContextsClient>>();
@@ -47,7 +47,7 @@ namespace GranSteL.DialogflowBalancer
             {
                 var scopeName = scopes[i];
                 var scope = new Scope(scopeName, i);
-                _scopes.Add(scope);
+                _scopes.Enqueue(scope);
             }
 
             foreach (var clientsConfiguration in configuration.ClientsConfigurations)
@@ -101,23 +101,14 @@ namespace GranSteL.DialogflowBalancer
 
         private string GetNextScopeKey()
         {
-            var orderedScopes = _scopes.OrderBy(s => s.Priority).ToList();
+            if (!_scopes.TryDequeue(out var scope))
+            {
+                return null;
+            }
+
+            _scopes.Enqueue(scope);
 
             var scopeKey = string.Empty;
-
-            for (var i = 0; i < orderedScopes.Count; i++)
-            {
-                var scope = orderedScopes[i];
-
-                if (i == 0)
-                {
-                    scopeKey = scope.Name;
-                    scope.Priority = orderedScopes.Count - 1;
-                    continue;
-                }
-
-                scope.Priority -= 1;
-            }
 
             return scopeKey;
         }
