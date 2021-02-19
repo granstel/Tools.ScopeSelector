@@ -2,16 +2,13 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using GranSteL.Helpers.Redis;
 using GranSteL.ScopesBalancer.Extensions;
 
 namespace GranSteL.ScopesBalancer
 {
     public class ScopesBalancer<T>
     {
-        private readonly TimeSpan _expiration;
-
-        private readonly IRedisCacheService _cache;
+        private readonly IScopesStorage _storage;
         private readonly ConcurrentQueue<Scope> _scopes;
 
         private readonly ConcurrentBag<ScopeItemWrapper<T>> _scopeItems;
@@ -19,14 +16,12 @@ namespace GranSteL.ScopesBalancer
         private readonly Func<ScopeContext, T> _initScopeItem;
 
         public ScopesBalancer(
-            IRedisCacheService cache,
+            IScopesStorage storage,
             ICollection<ScopeContext> scopesContexts,
             Func<ScopeContext, T> initScopeItem
             )
         {
-            _expiration = TimeSpan.MaxValue;
-
-            _cache = cache;
+            _storage = storage;
 
             _scopes = new ConcurrentQueue<Scope>();
 
@@ -48,24 +43,22 @@ namespace GranSteL.ScopesBalancer
             }
         }
 
-        public TResult InvokeScopeItem<TResult>(string key, Func<T, ScopeContext, TResult> invoke, string suggestedScopeKey = null)
+        public TResult InvokeScopeItem<TResult>(string invocationKey, Func<T, ScopeContext, TResult> invoke, string suggestedScopeKey = null)
         {
-            var scopeWrapper = GetScopeItem(key, suggestedScopeKey);
+            var scopeWrapper = GetScopeItem(invocationKey, suggestedScopeKey);
 
             var result = invoke(scopeWrapper.ScopeItem, scopeWrapper.Context);
 
             return result;
         }
 
-        private ScopeItemWrapper<T> GetScopeItem(string key, string suggestedScopeKey = null)
+        private ScopeItemWrapper<T> GetScopeItem(string invocationKey, string suggestedScopeKey = null)
         {
-            var cacheKey = GetCacheKey(key);
-
             var scopeItem = _scopeItems.FirstOrDefault(s => string.Equals(s.Context.ScopeId, suggestedScopeKey));
 
             if (scopeItem == null)
             {
-                if (!_cache.TryGet(cacheKey, out string scopeKey))
+                if (!_storage.TryGetScopeKey(invocationKey, out string scopeKey))
                 {
                     scopeKey = GetNextScopeKey();
                 }
@@ -73,7 +66,7 @@ namespace GranSteL.ScopesBalancer
                 scopeItem = _scopeItems.First(s => string.Equals(s.Context.ScopeId, scopeKey));
             }
 
-            _cache.AddAsync(cacheKey, scopeItem.Context.ScopeId, _expiration).Forget();
+            _storage.AddAsync(invocationKey, scopeItem.Context.ScopeId).Forget();
 
             return scopeItem;
 
@@ -98,11 +91,6 @@ namespace GranSteL.ScopesBalancer
             var wrapper = new ScopeItemWrapper<T>(scopeItem, context);
 
             _scopeItems.Add(wrapper);
-        }
-
-        private string GetCacheKey(string key)
-        {
-            return $"scopes:{key}";
         }
     }
 }
