@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using GranSteL.Helpers.Redis;
 using GranSteL.ScopesBalancer.Extensions;
@@ -15,15 +16,15 @@ namespace GranSteL.ScopesBalancer
 
         private readonly ConcurrentBag<ScopeWrapper<T>> _balancedScopes;
 
-        public Func<ScopeBalancerContext, T> InitBalancedScopes;
+        private readonly Func<ScopeContext, T> _initBalancedScopes;
 
         public ScopesBalancer(
             IRedisCacheService cache,
-            ScopesBalancerConfiguration balancerConfiguration,
-            Func<ScopeBalancerContext, T> initBalancedScope
+            ICollection<ScopeContext> scopesContexts,
+            Func<ScopeContext, T> initBalancedScope
             )
         {
-            _expiration = balancerConfiguration.ScopeExpiration;
+            _expiration = TimeSpan.MaxValue;
 
             _cache = cache;
 
@@ -31,25 +32,23 @@ namespace GranSteL.ScopesBalancer
 
             _balancedScopes = new ConcurrentBag<ScopeWrapper<T>>();
 
-            InitBalancedScopes = initBalancedScope;
+            _initBalancedScopes = initBalancedScope;
 
-            var configurations = balancerConfiguration.ClientsConfigurations.DistinctBy(c => c.ScopeId).ToList();
+            var contexts = scopesContexts.DistinctBy(c => c.ScopeId).ToList();
 
-            for (var i = 0; i < configurations.Count; i++)
+            for (var i = 0; i < contexts.Count; i++)
             {
-                var configuration = configurations[i];
+                var context = contexts[i];
 
-                var scope = new Scope(configuration.ScopeId, i);
+                var scope = new Scope(context.ScopeId, i);
 
                 _scopes.Enqueue(scope);
-
-                var context = new ScopeBalancerContext(configuration);
 
                 InitSessionsClientInternal(context);
             }
         }
 
-        public TResult InvokeScopeItem<TResult>(string key, Func<T, ScopeBalancerContext, TResult> invoke, string suggestedScopeKey = null)
+        public TResult InvokeScopeItem<TResult>(string key, Func<T, ScopeContext, TResult> invoke, string suggestedScopeKey = null)
         {
             var scopeWrapper = GetScopeWrapper(key, suggestedScopeKey);
 
@@ -62,7 +61,7 @@ namespace GranSteL.ScopesBalancer
         {
             var cacheKey = GetCacheKey(key);
 
-            var clientWrapper = _balancedScopes.FirstOrDefault(c => string.Equals(c.ScopeKey, suggestedScopeKey));
+            var clientWrapper = _balancedScopes.FirstOrDefault(c => string.Equals(c.ScopeId, suggestedScopeKey));
 
             if (clientWrapper == null)
             {
@@ -71,10 +70,10 @@ namespace GranSteL.ScopesBalancer
                     scopeKey = GetNextScopeKey();
                 }
 
-                clientWrapper = _balancedScopes.First(c => string.Equals(c.ScopeKey, scopeKey));
+                clientWrapper = _balancedScopes.First(c => string.Equals(c.ScopeId, scopeKey));
             }
 
-            _cache.AddAsync(cacheKey, clientWrapper.ScopeKey, _expiration).Forget();
+            _cache.AddAsync(cacheKey, clientWrapper.ScopeId, _expiration).Forget();
 
             return clientWrapper;
 
@@ -92,9 +91,9 @@ namespace GranSteL.ScopesBalancer
             return scope.Id;
         }
 
-        private void InitSessionsClientInternal(ScopeBalancerContext context)
+        private void InitSessionsClientInternal(ScopeContext context)
         {
-            var initBalancedScopes = InitBalancedScopes(context);
+            var initBalancedScopes = _initBalancedScopes(context);
 
             var wrapper = new ScopeWrapper<T>(initBalancedScopes, context);
 

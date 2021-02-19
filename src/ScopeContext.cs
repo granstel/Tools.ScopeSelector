@@ -1,8 +1,8 @@
 ﻿namespace GranSteL.ScopesBalancer
 {
-    public class ScopeConfiguration
+    public class ScopeContext
     {
-        public ScopeConfiguration(string scopeId, string jsonPath)
+        public ScopeContext(string scopeId, string jsonPath)
         {
             ScopeId = scopeId;
             JsonPath = jsonPath;

@@ -2,17 +2,17 @@
 {
     public class ScopeWrapper<T>
     {
-        public ScopeWrapper(T balancedScopeItem, ScopeBalancerContext context)
+        public ScopeWrapper(T balancedScopeItem, ScopeContext context)
         {
             BalancedScopeItem = balancedScopeItem;
-            ScopeKey = context.ScopeId;
+            ScopeId = context.ScopeId;
             Context = context;
         }
 
         /// <summary>
         /// Scope key (for example, Df agent id)
         /// </summary>
-        public string ScopeKey { get; set; }
+        public string ScopeId { get; set; }
 
         /// <summary>
         /// Balanced item instance
@@ -20,8 +20,8 @@
         public T BalancedScopeItem { get; }
 
         /// <summary>
-        /// Client context
+        /// Invoking context
         /// </summary>
-        public ScopeBalancerContext Context { get; }
+        public ScopeContext Context { get; }
     }
 }
