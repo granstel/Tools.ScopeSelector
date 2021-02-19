@@ -1,8 +1,8 @@
-﻿namespace GranSteL.DialogflowBalancer
+﻿namespace GranSteL.Tools
 {
-    public class DialogflowContext
+    public class ScopeBalancerContext
     {
-        public DialogflowContext(DialogflowClientsConfiguration configurations)
+        public ScopeBalancerContext(DialogflowClientsConfiguration configurations)
         {
             ProjectId = configurations.ProjectId;
             JsonPath = configurations.JsonPath;

@@ -1,10 +1,10 @@
-﻿namespace GranSteL.DialogflowBalancer
+﻿namespace GranSteL.Tools
 {
-    public class DialogflowClientWrapper<T>
+    public class ScopeWrapper<T>
     {
-        public DialogflowClientWrapper(T client, DialogflowContext context)
+        public ScopeWrapper(T balancedScopeItem, ScopeBalancerContext context)
         {
-            Client = client;
+            BalancedScopeItem = balancedScopeItem;
             ScopeKey = context.ProjectId;
             Context = context;
         }
@@ -15,13 +15,13 @@
         public string ScopeKey { get; set; }
 
         /// <summary>
-        /// Client instance
+        /// Balanced item instance
         /// </summary>
-        public T Client { get; }
+        public T BalancedScopeItem { get; }
 
         /// <summary>
         /// Client context
         /// </summary>
-        public DialogflowContext Context { get; }
+        public ScopeBalancerContext Context { get; }
     }
 }

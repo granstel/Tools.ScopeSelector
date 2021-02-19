@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace GranSteL.DialogflowBalancer
+namespace GranSteL.Tools
 {
-    public class DialogflowBalancerConfiguration
+    public class ScopesBalancerConfiguration
     {
         public virtual TimeSpan ScopeExpiration { get; set; }
 

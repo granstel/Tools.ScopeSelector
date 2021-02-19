@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace GranSteL.DialogflowBalancer.Extensions
+namespace GranSteL.Tools.Extensions
 {
     public static class TasksExtensions
     {

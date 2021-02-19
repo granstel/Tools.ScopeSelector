@@ -1,4 +1,4 @@
-﻿namespace GranSteL.DialogflowBalancer
+﻿namespace GranSteL.Tools
 {
     public class DialogflowClientsConfiguration
     {
