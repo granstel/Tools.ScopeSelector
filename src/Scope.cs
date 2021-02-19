@@ -1,14 +1,14 @@
-﻿namespace GranSteL.Tools
+﻿namespace GranSteL.ScopesBalancer
 {
     public class Scope
     {
-        public Scope(string scopeName, int priority)
+        public Scope(string scopeId, int priority)
         {
-            Name = scopeName;
+            Id = scopeId;
             Priority = priority;
         }
 
-        public string Name { get; set; }
+        public string Id { get; set; }
 
         public int Priority { get; set; }
     }

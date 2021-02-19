@@ -1,11 +1,11 @@
-﻿namespace GranSteL.Tools
+﻿namespace GranSteL.ScopesBalancer
 {
     public class ScopeWrapper<T>
     {
         public ScopeWrapper(T balancedScopeItem, ScopeBalancerContext context)
         {
             BalancedScopeItem = balancedScopeItem;
-            ScopeKey = context.ProjectId;
+            ScopeKey = context.ScopeId;
             Context = context;
         }
 

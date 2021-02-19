@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace GranSteL.Tools.Extensions
+namespace GranSteL.ScopesBalancer.Extensions
 {
     public static class TasksExtensions
     {

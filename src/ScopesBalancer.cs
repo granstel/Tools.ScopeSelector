@@ -2,10 +2,9 @@
 using System.Collections.Concurrent;
 using System.Linq;
 using GranSteL.Helpers.Redis;
-using GranSteL.Tools.Extensions;
+using GranSteL.ScopesBalancer.Extensions;
 
-// ReSharper disable once CheckNamespace
-namespace GranSteL.Tools
+namespace GranSteL.ScopesBalancer
 {
     public class ScopesBalancer<T>
     {
@@ -20,11 +19,11 @@ namespace GranSteL.Tools
 
         public ScopesBalancer(
             IRedisCacheService cache,
-            ScopesBalancerConfiguration configuration,
+            ScopesBalancerConfiguration balancerConfiguration,
             Func<ScopeBalancerContext, T> initBalancedScope
             )
         {
-            _expiration = configuration.ScopeExpiration;
+            _expiration = balancerConfiguration.ScopeExpiration;
 
             _cache = cache;
 
@@ -34,18 +33,17 @@ namespace GranSteL.Tools
 
             InitBalancedScopes = initBalancedScope;
 
-            var scopes = configuration.ClientsConfigurations.Select(c => c.ProjectId).Distinct().ToList();
+            var configurations = balancerConfiguration.ClientsConfigurations.DistinctBy(c => c.ScopeId).ToList();
 
-            for (var i = 0; i < scopes.Count; i++)
+            for (var i = 0; i < configurations.Count; i++)
             {
-                var scopeName = scopes[i];
-                var scope = new Scope(scopeName, i);
+                var configuration = configurations[i];
+
+                var scope = new Scope(configuration.ScopeId, i);
+
                 _scopes.Enqueue(scope);
-            }
 
-            foreach (var clientsConfiguration in configuration.ClientsConfigurations)
-            {
-                var context = new ScopeBalancerContext(clientsConfiguration);
+                var context = new ScopeBalancerContext(configuration);
 
                 InitSessionsClientInternal(context);
             }
@@ -91,7 +89,7 @@ namespace GranSteL.Tools
 
             _scopes.Enqueue(scope);
 
-            return scope.Name;
+            return scope.Id;
         }
 
         private void InitSessionsClientInternal(ScopeBalancerContext context)

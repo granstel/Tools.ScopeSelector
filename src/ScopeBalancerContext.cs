@@ -1,14 +1,14 @@
-﻿namespace GranSteL.Tools
+﻿namespace GranSteL.ScopesBalancer
 {
     public class ScopeBalancerContext
     {
-        public ScopeBalancerContext(DialogflowClientsConfiguration configurations)
+        public ScopeBalancerContext(ScopeConfiguration configurations)
         {
-            ProjectId = configurations.ProjectId;
+            ScopeId = configurations.ScopeId;
             JsonPath = configurations.JsonPath;
         }
 
-        public string ProjectId { get; }
+        public string ScopeId { get; }
 
         public string JsonPath { get; }
     }
