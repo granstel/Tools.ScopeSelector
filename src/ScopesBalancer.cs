@@ -11,23 +11,19 @@ namespace GranSteL.ScopesBalancer
         private readonly IScopesStorage _storage;
         private readonly ConcurrentQueue<Scope> _scopes;
 
-        private readonly ConcurrentBag<ScopeItemWrapper<T>> _scopeItems;
-
-        private readonly Func<ScopeContext, T> _initScopeItem;
+        private readonly ConcurrentBag<ScopeContext<T>> _scopeItems;
 
         public ScopesBalancer(
             IScopesStorage storage,
-            ICollection<ScopeContext> scopesContexts,
-            Func<ScopeContext, T> initScopeItem
+            ICollection<ScopeContext<T>> scopesContexts,
+            Func<ScopeContext<T>, T> initScopeItem
             )
         {
             _storage = storage;
 
             _scopes = new ConcurrentQueue<Scope>();
 
-            _scopeItems = new ConcurrentBag<ScopeItemWrapper<T>>();
-
-            _initScopeItem = initScopeItem;
+            _scopeItems = new ConcurrentBag<ScopeContext<T>>();
 
             var contexts = scopesContexts.DistinctBy(c => c.ScopeId).ToList();
 
@@ -39,36 +35,40 @@ namespace GranSteL.ScopesBalancer
 
                 _scopes.Enqueue(scope);
 
-                InitScopeItemInternal(context);
+                var scopeItem = initScopeItem(context);
+
+                context.ScopeItem = scopeItem;
+
+                _scopeItems.Add(context);
             }
         }
 
-        public TResult Invoke<TResult>(string invocationKey, Func<T, ScopeContext, TResult> invoke, string suggestedScopeKey = null)
+        public TResult Invoke<TResult>(string invocationKey, Func<ScopeContext<T>, TResult> invoke, string suggestedScopeKey = null)
         {
-            var scopeWrapper = GetScopeItem(invocationKey, suggestedScopeKey);
+            var context = GetScopeContext(invocationKey, suggestedScopeKey);
 
-            var result = invoke(scopeWrapper.ScopeItem, scopeWrapper.Context);
+            var result = invoke(context);
 
             return result;
         }
 
-        private ScopeItemWrapper<T> GetScopeItem(string invocationKey, string suggestedScopeKey = null)
+        private ScopeContext<T> GetScopeContext(string invocationKey, string suggestedScopeKey = null)
         {
-            var scopeItem = _scopeItems.FirstOrDefault(s => string.Equals(s.Context.ScopeId, suggestedScopeKey));
+            var context = _scopeItems.FirstOrDefault(s => string.Equals(s.ScopeId, suggestedScopeKey));
 
-            if (scopeItem == null)
+            if (context == null)
             {
                 if (!_storage.TryGetScopeKey(invocationKey, out string scopeKey))
                 {
                     scopeKey = GetNextScopeKey();
                 }
 
-                scopeItem = _scopeItems.First(s => string.Equals(s.Context.ScopeId, scopeKey));
+                context = _scopeItems.First(s => string.Equals(s.ScopeId, scopeKey));
             }
 
-            _storage.Add(invocationKey, scopeItem.Context.ScopeId);
+            _storage.Add(invocationKey, context.ScopeId);
 
-            return scopeItem;
+            return context;
 
         }
 
@@ -82,15 +82,6 @@ namespace GranSteL.ScopesBalancer
             _scopes.Enqueue(scope);
 
             return scope.Id;
-        }
-
-        private void InitScopeItemInternal(ScopeContext context)
-        {
-            var scopeItem = _initScopeItem(context);
-
-            var wrapper = new ScopeItemWrapper<T>(scopeItem, context);
-
-            _scopeItems.Add(wrapper);
         }
     }
 }
