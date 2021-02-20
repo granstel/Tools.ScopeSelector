@@ -43,7 +43,7 @@ namespace GranSteL.ScopesBalancer
             }
         }
 
-        public TResult InvokeScopeItem<TResult>(string invocationKey, Func<T, ScopeContext, TResult> invoke, string suggestedScopeKey = null)
+        public TResult Invoke<TResult>(string invocationKey, Func<T, ScopeContext, TResult> invoke, string suggestedScopeKey = null)
         {
             var scopeWrapper = GetScopeItem(invocationKey, suggestedScopeKey);
 
@@ -66,7 +66,7 @@ namespace GranSteL.ScopesBalancer
                 scopeItem = _scopeItems.First(s => string.Equals(s.Context.ScopeId, scopeKey));
             }
 
-            _storage.AddAsync(invocationKey, scopeItem.Context.ScopeId).Forget();
+            _storage.Add(invocationKey, scopeItem.Context.ScopeId);
 
             return scopeItem;
 

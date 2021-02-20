@@ -1,15 +1,16 @@
-﻿namespace GranSteL.ScopesBalancer
+﻿using System.Collections.Generic;
+
+namespace GranSteL.ScopesBalancer
 {
     public class ScopeContext
     {
-        public ScopeContext(string scopeId, string jsonPath)
+        public ScopeContext(string scopeId)
         {
             ScopeId = scopeId;
-            JsonPath = jsonPath;
         }
 
-        public string ScopeId { get; set; }
+        public string ScopeId { get; }
 
-        public string JsonPath { get; set; }
+        public Dictionary<string, string> Parameters { get; set; }
     }
 }
