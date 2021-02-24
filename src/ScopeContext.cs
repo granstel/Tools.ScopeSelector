@@ -7,6 +7,7 @@ namespace GranSteL.ScopesBalancer
         public ScopeContext(string scopeId)
         {
             ScopeId = scopeId;
+            Parameters = new Dictionary<string, string>();
         }
 
         public string ScopeId { get; }

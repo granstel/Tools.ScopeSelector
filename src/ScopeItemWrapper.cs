@@ -1,6 +1,6 @@
 ﻿namespace GranSteL.ScopesBalancer
 {
-    public class ScopeItemWrapper<T>
+    internal class ScopeItemWrapper<T>
     {
         public ScopeItemWrapper(T scopeItem, ScopeContext context)
         {

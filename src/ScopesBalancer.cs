@@ -8,12 +8,18 @@ namespace GranSteL.ScopesBalancer
 {
     public class ScopesBalancer<T>
     {
+        private static readonly ConcurrentQueue<string> ScopesIds;
+
         private readonly IScopesStorage _storage;
-        private readonly ConcurrentQueue<Scope> _scopes;
 
         private readonly ConcurrentBag<ScopeItemWrapper<T>> _scopeItems;
 
         private readonly Func<ScopeContext, T> _initScopeItem;
+
+        static ScopesBalancer()
+        {
+            ScopesIds = new ConcurrentQueue<string>();
+        }
 
         public ScopesBalancer(
             IScopesStorage storage,
@@ -23,21 +29,18 @@ namespace GranSteL.ScopesBalancer
         {
             _storage = storage;
 
-            _scopes = new ConcurrentQueue<Scope>();
-
             _scopeItems = new ConcurrentBag<ScopeItemWrapper<T>>();
 
             _initScopeItem = initScopeItem;
 
             var contexts = scopesContexts.DistinctBy(c => c.ScopeId).ToList();
 
-            for (var i = 0; i < contexts.Count; i++)
+            foreach (var context in contexts)
             {
-                var context = contexts[i];
-
-                var scope = new Scope(context.ScopeId, i);
-
-                _scopes.Enqueue(scope);
+                if (!ScopesIds.Contains(context.ScopeId))
+                {
+                    ScopesIds.Enqueue(context.ScopeId);
+                }
 
                 InitScopeItemInternal(context);
             }
@@ -74,14 +77,14 @@ namespace GranSteL.ScopesBalancer
 
         private string GetNextScopeKey()
         {
-            if (!_scopes.TryDequeue(out var scope))
+            if (!ScopesIds.TryDequeue(out var scopeId))
             {
                 return null;
             }
 
-            _scopes.Enqueue(scope);
+            ScopesIds.Enqueue(scopeId);
 
-            return scope.Id;
+            return scopeId;
         }
 
         private void InitScopeItemInternal(ScopeContext context)
