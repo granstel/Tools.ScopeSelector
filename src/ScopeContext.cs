@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace GranSteL.ScopesBalancer
+namespace GranSteL.Tools.ScopeSelector
 {
     public class ScopeContext
     {

@@ -1,4 +1,4 @@
-﻿namespace GranSteL.ScopesBalancer
+﻿namespace GranSteL.Tools.ScopeSelector
 {
     internal class ScopeItemWrapper<T>
     {

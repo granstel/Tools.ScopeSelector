@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace GranSteL.ScopesBalancer.Extensions
+namespace GranSteL.Tools.ScopeSelector.Extensions
 {
     public static class EnumerableExtensions
     {

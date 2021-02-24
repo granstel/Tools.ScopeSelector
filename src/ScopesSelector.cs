@@ -2,11 +2,11 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using GranSteL.ScopesBalancer.Extensions;
+using GranSteL.Tools.ScopeSelector.Extensions;
 
-namespace GranSteL.ScopesBalancer
+namespace GranSteL.Tools.ScopeSelector
 {
-    public class ScopesBalancer<T>
+    public class ScopesSelector<T>
     {
         private static readonly ConcurrentQueue<string> ScopesIds;
 
@@ -14,14 +14,12 @@ namespace GranSteL.ScopesBalancer
 
         private readonly ConcurrentBag<ScopeItemWrapper<T>> _scopeItems;
 
-        private readonly Func<ScopeContext, T> _initScopeItem;
-
-        static ScopesBalancer()
+        static ScopesSelector()
         {
             ScopesIds = new ConcurrentQueue<string>();
         }
 
-        public ScopesBalancer(
+        public ScopesSelector(
             IScopesStorage storage,
             ICollection<ScopeContext> scopesContexts,
             Func<ScopeContext, T> initScopeItem
@@ -30,8 +28,6 @@ namespace GranSteL.ScopesBalancer
             _storage = storage;
 
             _scopeItems = new ConcurrentBag<ScopeItemWrapper<T>>();
-
-            _initScopeItem = initScopeItem;
 
             var contexts = scopesContexts.DistinctBy(c => c.ScopeId).ToList();
 
@@ -42,7 +38,11 @@ namespace GranSteL.ScopesBalancer
                     ScopesIds.Enqueue(context.ScopeId);
                 }
 
-                InitScopeItemInternal(context);
+                var scopeItem = initScopeItem(context);
+
+                var wrapper = new ScopeItemWrapper<T>(scopeItem, context);
+
+                _scopeItems.Add(wrapper);
             }
         }
 
@@ -63,7 +63,7 @@ namespace GranSteL.ScopesBalancer
             {
                 if (!_storage.TryGetScopeKey(invocationKey, out string scopeKey))
                 {
-                    scopeKey = GetNextScopeKey();
+                    scopeKey = SelectScope();
                 }
 
                 scopeItem = _scopeItems.First(s => string.Equals(s.Context.ScopeId, scopeKey));
@@ -75,7 +75,7 @@ namespace GranSteL.ScopesBalancer
 
         }
 
-        private string GetNextScopeKey()
+        private string SelectScope()
         {
             if (!ScopesIds.TryDequeue(out var scopeId))
             {
@@ -85,15 +85,6 @@ namespace GranSteL.ScopesBalancer
             ScopesIds.Enqueue(scopeId);
 
             return scopeId;
-        }
-
-        private void InitScopeItemInternal(ScopeContext context)
-        {
-            var scopeItem = _initScopeItem(context);
-
-            var wrapper = new ScopeItemWrapper<T>(scopeItem, context);
-
-            _scopeItems.Add(wrapper);
         }
     }
 }
