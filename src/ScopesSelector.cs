@@ -8,24 +8,17 @@ namespace GranSteL.Tools.ScopeSelector
 {
     public class ScopesSelector<T>
     {
-        private static readonly ConcurrentQueue<string> ScopesIds;
-
-        private readonly IScopesStorage _storage;
+        private readonly IScopeBindingStorage _bindingStorage;
 
         private readonly ConcurrentBag<ScopeItemWrapper<T>> _scopeItems;
 
-        static ScopesSelector()
-        {
-            ScopesIds = new ConcurrentQueue<string>();
-        }
-
         public ScopesSelector(
-            IScopesStorage storage,
+            IScopeBindingStorage bindingStorage,
             ICollection<ScopeContext> scopesContexts,
             Func<ScopeContext, T> initScopeItem
             )
         {
-            _storage = storage;
+            _bindingStorage = bindingStorage;
 
             _scopeItems = new ConcurrentBag<ScopeItemWrapper<T>>();
 
@@ -33,9 +26,9 @@ namespace GranSteL.Tools.ScopeSelector
 
             foreach (var context in contexts)
             {
-                if (!ScopesIds.Contains(context.ScopeId))
+                if (!ScopeStorage.ScopesIds.Contains(context.ScopeId))
                 {
-                    ScopesIds.Enqueue(context.ScopeId);
+                    ScopeStorage.ScopesIds.Enqueue(context.ScopeId);
                 }
 
                 var scopeItem = initScopeItem(context);
@@ -46,43 +39,42 @@ namespace GranSteL.Tools.ScopeSelector
             }
         }
 
-        public TResult Invoke<TResult>(string invocationKey, Func<T, ScopeContext, TResult> invoke, string suggestedScopeKey = null)
+        public TResult Invoke<TResult>(string bindingKey, Func<T, ScopeContext, TResult> invoke, string suggestedScopeId = null)
         {
-            var scopeWrapper = GetScopeItem(invocationKey, suggestedScopeKey);
+            var scopeWrapper = GetScopeItem(bindingKey, suggestedScopeId);
 
             var result = invoke(scopeWrapper.ScopeItem, scopeWrapper.Context);
 
             return result;
         }
 
-        private ScopeItemWrapper<T> GetScopeItem(string invocationKey, string suggestedScopeKey = null)
+        private ScopeItemWrapper<T> GetScopeItem(string bindingKey, string suggestedScopeId = null)
         {
-            var scopeItem = _scopeItems.FirstOrDefault(s => string.Equals(s.Context.ScopeId, suggestedScopeKey));
+            var scopeItem = _scopeItems.FirstOrDefault(s => string.Equals(s.Context.ScopeId, suggestedScopeId));
 
             if (scopeItem == null)
             {
-                if (!_storage.TryGetScopeKey(invocationKey, out string scopeKey))
+                if (!_bindingStorage.TryGet(bindingKey, out string scopeId))
                 {
-                    scopeKey = SelectScope();
+                    scopeId = SelectScope();
                 }
 
-                scopeItem = _scopeItems.First(s => string.Equals(s.Context.ScopeId, scopeKey));
+                scopeItem = _scopeItems.First(s => string.Equals(s.Context.ScopeId, scopeId));
             }
 
-            _storage.Add(invocationKey, scopeItem.Context.ScopeId);
+            _bindingStorage.Add(bindingKey, scopeItem.Context.ScopeId);
 
             return scopeItem;
-
         }
 
         private string SelectScope()
         {
-            if (!ScopesIds.TryDequeue(out var scopeId))
+            if (!ScopeStorage.ScopesIds.TryDequeue(out var scopeId))
             {
                 return null;
             }
 
-            ScopesIds.Enqueue(scopeId);
+            ScopeStorage.ScopesIds.Enqueue(scopeId);
 
             return scopeId;
         }
