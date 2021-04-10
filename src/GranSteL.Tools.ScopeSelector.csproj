@@ -3,8 +3,8 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>0.0.3</Version>
-    <Description>Unified scope selector</Description>
+    <Version>0.0.4</Version>
+    <Description>Fix error, when there is old scope key at storage</Description>
   </PropertyGroup>
 
 </Project>

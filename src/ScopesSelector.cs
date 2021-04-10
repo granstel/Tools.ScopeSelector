@@ -59,7 +59,14 @@ namespace GranSteL.Tools.ScopeSelector
                     scopeId = SelectScope();
                 }
 
-                scopeItem = _scopeItems.First(s => string.Equals(s.Context.ScopeId, scopeId));
+                scopeItem = _scopeItems.FirstOrDefault(s => string.Equals(s.Context.ScopeId, scopeId));
+            }
+
+            if (scopeItem == null)
+            {
+                var scopeId = SelectScope();
+
+                scopeItem = _scopeItems.FirstOrDefault(s => string.Equals(s.Context.ScopeId, scopeId));
             }
 
             _bindingStorage.Add(bindingKey, scopeItem.Context.ScopeId);
