@@ -9,16 +9,19 @@ namespace GranSteL.Tools.ScopeSelector
     public class ScopesSelector<T>
     {
         private readonly IScopeBindingStorage _bindingStorage;
+        private readonly int _parallelScopes;
 
         private readonly ConcurrentBag<ScopeItemWrapper<T>> _scopeItems;
 
         public ScopesSelector(
             IScopeBindingStorage bindingStorage,
             ICollection<ScopeContext> scopesContexts,
-            Func<ScopeContext, T> initScopeItem
+            Func<ScopeContext, T> initScopeItem,
+            int parallelScopes = 1
             )
         {
             _bindingStorage = bindingStorage;
+            _parallelScopes = parallelScopes;
 
             _scopeItems = new ConcurrentBag<ScopeItemWrapper<T>>();
 
@@ -39,39 +42,36 @@ namespace GranSteL.Tools.ScopeSelector
             }
         }
 
-        public TResult Invoke<TResult>(string bindingKey, Func<T, ScopeContext, TResult> invoke, string suggestedScopeId = null)
+        public TResult Invoke<TResult>(string bindingKey, Func<IEnumerable<ScopeItemWrapper<T>>, TResult> invoke, params string[] suggestedScopeId)
         {
             var scopeWrapper = GetScopeItem(bindingKey, suggestedScopeId);
 
-            var result = invoke(scopeWrapper.ScopeItem, scopeWrapper.Context);
+            var result = invoke(scopeWrapper);
 
             return result;
         }
 
-        private ScopeItemWrapper<T> GetScopeItem(string bindingKey, string suggestedScopeId = null)
+        private IEnumerable<ScopeItemWrapper<T>> GetScopeItem(string bindingKey, params string[] suggestedScopeId)
         {
-            var scopeItem = _scopeItems.FirstOrDefault(s => string.Equals(s.Context.ScopeId, suggestedScopeId));
+            var scopeItems = _scopeItems.Where(s => suggestedScopeId.Contains(s.Context.ScopeId)).ToList();
 
-            if (scopeItem == null)
+            if (!scopeItems.Any())
             {
-                if (!_bindingStorage.TryGet(bindingKey, out string scopeId))
+                if (!_bindingStorage.TryGet(bindingKey, out ICollection<string> scopeId))
                 {
-                    scopeId = SelectScope();
+                    for (var i = 0; i < _parallelScopes; i++)
+                    {
+                        scopeId.Add(SelectScope());
+                        
+                    }
+                    
+                    scopeItems.Add(_scopeItems.FirstOrDefault(s => scopeId.Contains(s.Context.ScopeId)));
                 }
 
-                scopeItem = _scopeItems.FirstOrDefault(s => string.Equals(s.Context.ScopeId, scopeId));
+                _bindingStorage.Add(bindingKey, scopeItems.Select(i => i.Context.ScopeId).ToArray());
             }
 
-            if (scopeItem == null)
-            {
-                var scopeId = SelectScope();
-
-                scopeItem = _scopeItems.FirstOrDefault(s => string.Equals(s.Context.ScopeId, scopeId));
-            }
-
-            _bindingStorage.Add(bindingKey, scopeItem.Context.ScopeId);
-
-            return scopeItem;
+            return scopeItems;
         }
 
         private string SelectScope()

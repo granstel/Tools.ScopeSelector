@@ -1,6 +1,6 @@
 ﻿namespace GranSteL.Tools.ScopeSelector
 {
-    internal class ScopeItemWrapper<T>
+    public class ScopeItemWrapper<T>
     {
         public ScopeItemWrapper(T scopeItem, ScopeContext context)
         {
