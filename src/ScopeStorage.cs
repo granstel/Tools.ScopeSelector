@@ -10,5 +10,17 @@ namespace GranSteL.Tools.ScopeSelector
         {
             ScopesIds = new ConcurrentQueue<string>();
         }
+
+        public static string GetNextScopeId()
+        {
+            if (!ScopesIds.TryDequeue(out var scopeId))
+            {
+                return null;
+            }
+
+            ScopesIds.Enqueue(scopeId);
+
+            return scopeId;
+        }
     }
 }

@@ -42,23 +42,11 @@ namespace GranSteL.Tools.ScopeSelector
 
         private ScopeInstanceWrapper<T> GetItem(string scopeId = null)
         {
-            scopeId ??= SelectScope();
+            scopeId ??= ScopeStorage.GetNextScopeId();
 
             var scopeItem = _items.FirstOrDefault(item => string.Equals(item.Context.ScopeId, scopeId));
 
             return scopeItem;
-        }
-
-        private string SelectScope()
-        {
-            if (!ScopeStorage.ScopesIds.TryDequeue(out var scopeId))
-            {
-                return null;
-            }
-
-            ScopeStorage.ScopesIds.Enqueue(scopeId);
-
-            return scopeId;
         }
     }
 }
