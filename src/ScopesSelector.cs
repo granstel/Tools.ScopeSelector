@@ -2,7 +2,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using GranSteL.Tools.ScopeSelector.Extensions;
 
 namespace GranSteL.Tools.ScopeSelector
 {
@@ -14,7 +13,7 @@ namespace GranSteL.Tools.ScopeSelector
 
         public ScopesSelector(
             IScopeBindingStorage bindingStorage,
-            ICollection<ScopeContext> scopesContexts,
+            IEnumerable<ScopeContext> scopesContexts,
             Func<ScopeContext, T> initScopeItem
             )
         {
