@@ -32,27 +32,20 @@ namespace GranSteL.Tools.ScopeSelector
             }
         }
 
-        public TResult Invoke<TResult>(string bindingKey, Func<T, ScopeContext, TResult> invoke, string suggestedScopeId = null)
+        public TResult Invoke<TResult>(Func<T, ScopeContext, TResult> invoke, string suggestedScopeId = null)
         {
-            var scopeWrapper = GetScopeItem(bindingKey, suggestedScopeId);
+            var scopeWrapper = GetScopeItem(suggestedScopeId);
 
             var result = invoke(scopeWrapper.ScopeItem, scopeWrapper.Context);
 
             return result;
         }
 
-        private ScopeItemWrapper<T> GetScopeItem(string bindingKey, string suggestedScopeId = null)
+        private ScopeItemWrapper<T> GetScopeItem(string scopeId = null)
         {
-            var scopeItem = _scopeItems.FirstOrDefault(s => string.Equals(s.Context.ScopeId, suggestedScopeId));
+            scopeId ??= SelectScope();
 
-            if (scopeItem is not null)
-            {
-                return scopeItem;
-            }
-
-            var scopeId = SelectScope();
-
-            scopeItem = _scopeItems.FirstOrDefault(s => string.Equals(s.Context.ScopeId, scopeId));
+            var scopeItem = _scopeItems.FirstOrDefault(s => string.Equals(s.Context.ScopeId, scopeId));
 
             return scopeItem;
         }
