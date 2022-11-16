@@ -7,15 +7,14 @@ namespace GranSteL.Tools.ScopeSelector
 {
     public class ScopesSelector<T>
     {
-        private readonly ConcurrentBag<ScopeItemWrapper<T>> _scopeItems;
+        /// <summary>
+        /// Scope items
+        /// </summary>
+        private readonly ConcurrentBag<ScopeInstanceWrapper<T>> _items = new();
 
-        public ScopesSelector(IEnumerable<ScopeContext> scopesContexts,
-            Func<ScopeContext, T> initScopeItem
-            )
+        public ScopesSelector(IEnumerable<ScopeContext> contexts, Func<ScopeContext, T> initInstance)
         {
-            _scopeItems = new ConcurrentBag<ScopeItemWrapper<T>>();
-
-            var contexts = scopesContexts.DistinctBy(c => c.ScopeId).ToList();
+            contexts = contexts.DistinctBy(c => c.ScopeId);
 
             foreach (var context in contexts)
             {
@@ -24,28 +23,28 @@ namespace GranSteL.Tools.ScopeSelector
                     ScopeStorage.ScopesIds.Enqueue(context.ScopeId);
                 }
 
-                var scopeItem = initScopeItem(context);
+                var scopeInstance = initInstance(context);
 
-                var wrapper = new ScopeItemWrapper<T>(scopeItem, context);
+                var item = new ScopeInstanceWrapper<T>(scopeInstance, context);
 
-                _scopeItems.Add(wrapper);
+                _items.Add(item);
             }
         }
 
-        public TResult Invoke<TResult>(Func<T, ScopeContext, TResult> invoke, string suggestedScopeId = null)
+        public TResult Invoke<TResult>(Func<T, ScopeContext, TResult> invoke, string scopeId = null)
         {
-            var scopeWrapper = GetScopeItem(suggestedScopeId);
+            var item = GetItem(scopeId);
 
-            var result = invoke(scopeWrapper.ScopeItem, scopeWrapper.Context);
+            var result = invoke(item.Instance, item.Context);
 
             return result;
         }
 
-        private ScopeItemWrapper<T> GetScopeItem(string scopeId = null)
+        private ScopeInstanceWrapper<T> GetItem(string scopeId = null)
         {
             scopeId ??= SelectScope();
 
-            var scopeItem = _scopeItems.FirstOrDefault(s => string.Equals(s.Context.ScopeId, scopeId));
+            var scopeItem = _items.FirstOrDefault(item => string.Equals(item.Context.ScopeId, scopeId));
 
             return scopeItem;
         }
