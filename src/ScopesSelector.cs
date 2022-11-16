@@ -18,10 +18,7 @@ namespace GranSteL.Tools.ScopeSelector
 
             foreach (var context in contexts)
             {
-                if (!ScopeStorage.ScopesIds.Contains(context.ScopeId))
-                {
-                    ScopeStorage.ScopesIds.Enqueue(context.ScopeId);
-                }
+                ScopeStorage.TryAdd(context.ScopeId);
 
                 var scopeInstance = initInstance(context);
 
