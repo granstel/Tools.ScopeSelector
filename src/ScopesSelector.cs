@@ -7,18 +7,12 @@ namespace GranSteL.Tools.ScopeSelector
 {
     public class ScopesSelector<T>
     {
-        private readonly IScopeBindingStorage _bindingStorage;
-
         private readonly ConcurrentBag<ScopeItemWrapper<T>> _scopeItems;
 
-        public ScopesSelector(
-            IScopeBindingStorage bindingStorage,
-            IEnumerable<ScopeContext> scopesContexts,
+        public ScopesSelector(IEnumerable<ScopeContext> scopesContexts,
             Func<ScopeContext, T> initScopeItem
             )
         {
-            _bindingStorage = bindingStorage;
-
             _scopeItems = new ConcurrentBag<ScopeItemWrapper<T>>();
 
             var contexts = scopesContexts.DistinctBy(c => c.ScopeId).ToList();
@@ -51,24 +45,14 @@ namespace GranSteL.Tools.ScopeSelector
         {
             var scopeItem = _scopeItems.FirstOrDefault(s => string.Equals(s.Context.ScopeId, suggestedScopeId));
 
-            if (scopeItem == null)
+            if (scopeItem is not null)
             {
-                if (!_bindingStorage.TryGet(bindingKey, out string scopeId))
-                {
-                    scopeId = SelectScope();
-                }
-
-                scopeItem = _scopeItems.FirstOrDefault(s => string.Equals(s.Context.ScopeId, scopeId));
+                return scopeItem;
             }
 
-            if (scopeItem == null)
-            {
-                var scopeId = SelectScope();
+            var scopeId = SelectScope();
 
-                scopeItem = _scopeItems.FirstOrDefault(s => string.Equals(s.Context.ScopeId, scopeId));
-            }
-
-            _bindingStorage.Add(bindingKey, scopeItem.Context.ScopeId);
+            scopeItem = _scopeItems.FirstOrDefault(s => string.Equals(s.Context.ScopeId, scopeId));
 
             return scopeItem;
         }
