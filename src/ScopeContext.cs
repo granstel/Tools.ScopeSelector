@@ -12,6 +12,6 @@ namespace GranSteL.Tools.ScopeSelector
 
         public string ScopeId { get; }
 
-        public Dictionary<string, string> Parameters { get; set; }
+        public Dictionary<string, string> Parameters { get; init; }
     }
 }
