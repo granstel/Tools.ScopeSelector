@@ -18,6 +18,9 @@ namespace GranSteL.Tools.ScopeSelector
 
             foreach (var context in contexts)
             {
+                if (context.DoNotAddToQueue)
+                    continue;
+
                 ScopeStorage.TryAdd(context.ScopeId);
 
                 var scopeInstance = initInstance(context);
