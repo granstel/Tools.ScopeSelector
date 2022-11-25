@@ -15,6 +15,16 @@ namespace GranSteL.Tools.ScopeSelector
 
         public bool DoNotAddToQueue { get; }
 
-        public Dictionary<string, string> Parameters { get; init; }
+        private Dictionary<string, string> Parameters { get; }
+
+        public bool TryAddParameter(string parameter, string value)
+        {
+            return Parameters.TryAdd(parameter, value);
+        }
+
+        public bool TryGetParameterValue(string parameter, out string value)
+        {
+            return Parameters.TryGetValue(parameter, out value);
+        }
     }
 }
