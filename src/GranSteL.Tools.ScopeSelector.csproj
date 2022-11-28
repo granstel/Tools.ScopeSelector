@@ -20,7 +20,7 @@
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
 
     <Version>1.0.0</Version>
-    <PackageReleaseNotes>Refactored</PackageReleaseNotes>
+    <PackageReleaseNotes>Unified scope selector</PackageReleaseNotes>
   </PropertyGroup>
 
 
