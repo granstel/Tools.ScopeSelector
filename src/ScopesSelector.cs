@@ -10,7 +10,7 @@ namespace GranSteL.Tools.ScopeSelector
         /// <summary>
         /// Scope items
         /// </summary>
-        private readonly ConcurrentBag<ScopeInstanceWrapper<T>> _items = new();
+        private readonly ConcurrentDictionary<string, ScopeInstanceWrapper<T>> _items = new();
 
         public ScopesSelector(IEnumerable<ScopeContext> contexts, Func<ScopeContext, T> initInstance)
         {
@@ -27,7 +27,7 @@ namespace GranSteL.Tools.ScopeSelector
 
                 var item = new ScopeInstanceWrapper<T>(scopeInstance, context);
 
-                _items.Add(item);
+                _items.TryAdd(context.ScopeId, item);
             }
         }
 
@@ -44,7 +44,7 @@ namespace GranSteL.Tools.ScopeSelector
         {
             scopeId ??= ScopeStorage.GetNextScopeId();
 
-            var scopeItem = _items.FirstOrDefault(item => string.Equals(item.Context.ScopeId, scopeId));
+            _items.TryGetValue(scopeId, out var scopeItem);
 
             return scopeItem;
         }
